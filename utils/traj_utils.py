@@ -16,7 +16,7 @@ class TrajManager:
         self.which_dataset = which_dataset
         self.dataset_path = dataset_path
 
-        if self.which_dataset == "tum":
+        if self.which_dataset == "tum":#如果是tum数据集
             self.gt_poses = self.tum_load_poses(self.dataset_path + '/traj.txt')
         elif self.which_dataset == "replica":
             self.gt_poses = self.replica_load_poses(self.dataset_path + '/traj.txt')
@@ -24,7 +24,7 @@ class TrajManager:
             print("Unknown dataset!")
             sys.exit()
         
-        self.gt_poses_vis = np.array([x[:3, 3] for x in self.gt_poses])
+        self.gt_poses_vis = np.array([x[:3, 3] for x in self.gt_poses])#gt_poses_vis是gt_poses的前三行的最后一列
 
     def quaternion_rotation_matrix(self, Q, t):
         r = R.from_quat(Q)
@@ -41,16 +41,16 @@ class TrajManager:
     
     def replica_load_poses(self, path):
         poses = []
-        with open(path, "r") as f:
-            lines = f.readlines()
+        with open(path, "r") as f:#打开文件
+            lines = f.readlines()#读取文件的每一行
         for i in range(len(lines)):
             line = lines[i]
-            c2w = np.array(list(map(float, line.split()))).reshape(4, 4)
+            c2w = np.array(list(map(float, line.split()))).reshape(4, 4)#将每一行的数据转换成4*4的矩阵
             # c2w[:3, 1] *= -1
             # c2w[:3, 2] *= -1
             # c2w = torch.from_numpy(c2w).float()
             poses.append(c2w)
-        return np.array(poses)
+        return np.array(poses)#返回poses
 
     def pose_matrix_from_quaternion(self, pvec):
         from scipy.spatial.transform import Rotation

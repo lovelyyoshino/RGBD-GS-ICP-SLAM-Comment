@@ -16,14 +16,16 @@ from utils.traj_utils import TrajManager
 from gaussian_renderer import render, render_2, network_gui
 from tqdm import tqdm
 
-
+"""
+定义Tracker类，继承自SLAMParameters类，这里主要负责跟踪线程的实现
+"""
 class Tracker(SLAMParameters):
     def __init__(self, slam):
         super().__init__()
         self.dataset_path = slam.dataset_path
         self.output_path = slam.output_path
         os.makedirs(self.output_path, exist_ok=True)
-        self.verbose = slam.verbose
+        self.verbose = slam.verbose#是否输出详细信息
         self.keyframe_th = slam.keyframe_th
         self.knn_max_distance = slam.knn_max_distance
         self.overlapped_th = slam.overlapped_th
@@ -38,13 +40,13 @@ class Tracker(SLAMParameters):
         self.fy = slam.fy
         self.cx = slam.cx
         self.cy = slam.cy
-        self.depth_scale = slam.depth_scale
-        self.depth_trunc = slam.depth_trunc
+        self.depth_scale = slam.depth_scale#深度缩放
+        self.depth_trunc = slam.depth_trunc#深度截断
         
         self.viewer_fps = slam.viewer_fps
         self.keyframe_freq = slam.keyframe_freq
         self.max_correspondence_distance = slam.max_correspondence_distance
-        self.reg = pygicp.FastGICP()
+        self.reg = pygicp.FastGICP()#GICP
         
         # Camera poses
         self.trajmanager = TrajManager(self.camera_parameters[8], self.dataset_path)
@@ -75,10 +77,10 @@ class Tracker(SLAMParameters):
         self.new_keyframes = []
         self.gaussian_keyframe_idxs = []
 
-        self.shared_cam = slam.shared_cam
-        self.shared_new_points = slam.shared_new_points
-        self.shared_new_gaussians = slam.shared_new_gaussians
-        self.shared_target_gaussians = slam.shared_target_gaussians
+        self.shared_cam = slam.shared_cam#相机
+        self.shared_new_points = slam.shared_new_points#新点
+        self.shared_new_gaussians = slam.shared_new_gaussians#新高斯
+        self.shared_target_gaussians = slam.shared_target_gaussians#目标高斯
         self.end_of_dataset = slam.end_of_dataset
         self.is_tracking_keyframe_shared = slam.is_tracking_keyframe_shared
         self.is_mapping_keyframe_shared = slam.is_mapping_keyframe_shared
@@ -92,11 +94,11 @@ class Tracker(SLAMParameters):
         self.tracking()
     
     def tracking(self):
-        tt = torch.zeros((1,1)).float().cuda()
-        self.rgb_images, self.depth_images = self.get_images(f"{self.dataset_path}/images")
-        self.num_images = len(self.rgb_images)
-        self.reg.set_max_correspondence_distance(self.max_correspondence_distance)
-        self.reg.set_max_knn_distance(self.knn_max_distance)
+        tt = torch.zeros((1,1)).float().cuda()#创建一个全0的张量
+        self.rgb_images, self.depth_images = self.get_images(f"{self.dataset_path}/images")#获取图片和深度图
+        self.num_images = len(self.rgb_images)#图片数量
+        self.reg.set_max_correspondence_distance(self.max_correspondence_distance)#设置最大对应距离
+        self.reg.set_max_knn_distance(self.knn_max_distance)#设置最大knn距离
         if_mapping_keyframe = False
 
         # print("Waiting for mapping process to be prepared")
@@ -104,9 +106,9 @@ class Tracker(SLAMParameters):
         #     time.sleep(0.01)
 
         self.total_start_time = time.time()
-        pbar = tqdm(total=self.num_images)
+        pbar = tqdm(total=self.num_images)#进度条
 
-        for ii in range(self.num_images):
+        for ii in range(self.num_images):#遍历图片和深度图
             current_image = self.rgb_images.pop(0)
             depth_image = self.depth_images.pop(0)
 
@@ -115,42 +117,42 @@ class Tracker(SLAMParameters):
                 cv2.waitKey(1)
             current_image = cv2.cvtColor(current_image, cv2.COLOR_RGB2BGR)
             # Make pointcloud
-            points, colors, z_values, trackable_filter = self.downsample_and_make_pointcloud2(depth_image, current_image)
+            points, colors, z_values, trackable_filter = self.downsample_and_make_pointcloud2(depth_image, current_image)#下采样并生成点云，当中是有点云信息的
             # GICP
             if self.iteration_images == 0:
                 current_pose = self.poses[-1]
                 
                 # Update Camera pose #
-                current_pose = np.linalg.inv(current_pose)
+                current_pose = np.linalg.inv(current_pose)#求逆，得到当前位姿
                 T = current_pose[:3,3]
                 R = current_pose[:3,:3].transpose()
                 
                 # transform current points
-                points = np.matmul(R, points.transpose()).transpose() - np.matmul(R, T)
+                points = np.matmul(R, points.transpose()).transpose() - np.matmul(R, T)#转换当前点
                 # Set initial pointcloud to target points
-                self.reg.set_input_target(points)
+                self.reg.set_input_target(points)#设置目标点
                 
-                num_trackable_points = trackable_filter.shape[0]
-                input_filter = np.zeros(points.shape[0], dtype=np.int32)
-                input_filter[(trackable_filter)] = [range(1, num_trackable_points+1)]
+                num_trackable_points = trackable_filter.shape[0]#跟踪点的数量
+                input_filter = np.zeros(points.shape[0], dtype=np.int32)#初始化输入过滤器
+                input_filter[(trackable_filter)] = [range(1, num_trackable_points+1)]#设置输入过滤器
                 
-                self.reg.set_target_filter(num_trackable_points, input_filter)
-                self.reg.calculate_target_covariance_with_filter()
+                self.reg.set_target_filter(num_trackable_points, input_filter)#设置目标过滤器
+                self.reg.calculate_target_covariance_with_filter()#计算目标协方差
 
-                rots = self.reg.get_target_rotationsq()
-                scales = self.reg.get_target_scales()
+                rots = self.reg.get_target_rotationsq()#获取目标旋转
+                scales = self.reg.get_target_scales()#获取目标尺度
                 rots = np.reshape(rots, (-1,4))
                 scales = np.reshape(scales, (-1,3))
                 
                 # Assign first gaussian to shared memory
                 self.shared_new_gaussians.input_values(torch.tensor(points), torch.tensor(colors), 
                                                        torch.tensor(rots), torch.tensor(scales), 
-                                                       torch.tensor(z_values), torch.tensor(trackable_filter))
+                                                       torch.tensor(z_values), torch.tensor(trackable_filter))#输入高斯，当中包含有点云信息、颜色、旋转、尺度、z值和过滤器
                 
                 # Add first keyframe
-                depth_image = depth_image.astype(np.float32)/self.depth_scale
-                self.shared_cam.setup_cam(R, T, current_image, depth_image)
-                self.shared_cam.cam_idx[0] = self.iteration_images
+                depth_image = depth_image.astype(np.float32)/self.depth_scale#深度图
+                self.shared_cam.setup_cam(R, T, current_image, depth_image)#设置相机
+                self.shared_cam.cam_idx[0] = self.iteration_images#相机索引
                 
                 self.is_tracking_keyframe_shared[0] = 1
                 
@@ -158,16 +160,16 @@ class Tracker(SLAMParameters):
                     time.sleep(1e-15)
                     self.total_start_time = time.time()
             else:
-                self.reg.set_input_source(points)
+                self.reg.set_input_source(points)#设置源点
                 num_trackable_points = trackable_filter.shape[0]
                 input_filter = np.zeros(points.shape[0], dtype=np.int32)
-                input_filter[(trackable_filter)] = [range(1, num_trackable_points+1)]
-                self.reg.set_source_filter(num_trackable_points, input_filter)
+                input_filter[(trackable_filter)] = [range(1, num_trackable_points+1)]#设置输入过滤器
+                self.reg.set_source_filter(num_trackable_points, input_filter)#设置源过滤器
                 
-                initial_pose = self.poses[-1]
+                initial_pose = self.poses[-1]#初始位姿
 
-                current_pose = self.reg.align(initial_pose)
-                self.poses.append(current_pose)
+                current_pose = self.reg.align(initial_pose)#对齐
+                self.poses.append(current_pose)#添加当前位姿
 
                 # Update Camera pose #
                 current_pose = np.linalg.inv(current_pose)
@@ -184,7 +186,7 @@ class Tracker(SLAMParameters):
                 len_corres = len(np.where(distances<self.overlapped_th)[0]) # 5e-4 self.overlapped_th
                 
                 if  (self.iteration_images >= self.num_images-1 \
-                    or len_corres/distances.shape[0] < self.keyframe_th):
+                    or len_corres/distances.shape[0] < self.keyframe_th):#关键帧阈值，如果迭代次数大于等于图片数量-1或者关键帧数量小于关键帧阈值
                     if_tracking_keyframe = True
                     self.from_last_tracking_keyframe = 0
                 else:
@@ -223,17 +225,17 @@ class Tracker(SLAMParameters):
 
                     # Add new keyframe
                     depth_image = depth_image.astype(np.float32)/self.depth_scale
-                    self.shared_cam.setup_cam(R, T, current_image, depth_image)
-                    self.shared_cam.cam_idx[0] = self.iteration_images
+                    self.shared_cam.setup_cam(R, T, current_image, depth_image)#设置相机
+                    self.shared_cam.cam_idx[0] = self.iteration_images#相机索引
                     
                     self.is_tracking_keyframe_shared[0] = 1
                     
                     # Get new target point
-                    while not self.target_gaussians_ready[0]:
+                    while not self.target_gaussians_ready[0]:#目标高斯准备好
                         time.sleep(1e-15)
-                    target_points, target_rots, target_scales = self.shared_target_gaussians.get_values_np()
-                    self.reg.set_input_target(target_points)
-                    self.reg.set_target_covariances_fromqs(target_rots.flatten(), target_scales.flatten())
+                    target_points, target_rots, target_scales = self.shared_target_gaussians.get_values_np()#获取目标点、目标旋转和目标尺度
+                    self.reg.set_input_target(target_points)#设置目标点
+                    self.reg.set_target_covariances_fromqs(target_rots.flatten(), target_scales.flatten())#设置目标协方差
                     self.target_gaussians_ready[0] = 0
                     
                 elif if_mapping_keyframe:
@@ -259,7 +261,7 @@ class Tracker(SLAMParameters):
                     self.shared_cam.setup_cam(R, T, current_image, depth_image)
                     self.shared_cam.cam_idx[0] = self.iteration_images
                     
-                    self.is_mapping_keyframe_shared[0] = 1
+                    self.is_mapping_keyframe_shared[0] = 1#映射关键帧共享
             pbar.update(1)
             
             while 1/((time.time() - self.total_start_time)/(self.iteration_images+1)) > 30.:    #30. float(self.test)

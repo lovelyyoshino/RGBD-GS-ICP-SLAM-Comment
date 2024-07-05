@@ -116,12 +116,12 @@ class Mapper(SLAMParameters):
         while not self.is_tracking_keyframe_shared[0]:
             time.sleep(1e-15)
         
-        points, colors, rots, scales, z_values, trackable_filter = self.shared_new_gaussians.get_values()
-        self.gaussians.create_from_pcd2_tensor(points, colors, rots, scales, z_values, trackable_filter)
-        self.gaussians.spatial_lr_scale = self.scene_extent
-        self.gaussians.training_setup(self)
+        points, colors, rots, scales, z_values, trackable_filter = self.shared_new_gaussians.get_values()#获取共享内存中的新高斯点
+        self.gaussians.create_from_pcd2_tensor(points, colors, rots, scales, z_values, trackable_filter)#从点云中创建高斯模型
+        self.gaussians.spatial_lr_scale = self.scene_extent#空间学习率缩放
+        self.gaussians.training_setup(self)#训练设置
         self.gaussians.update_learning_rate(1)
-        self.gaussians.active_sh_degree = self.gaussians.max_sh_degree
+        self.gaussians.active_sh_degree = self.gaussians.max_sh_degree#高斯模型的最大sh度数
         self.is_tracking_keyframe_shared[0] = 0
         
         if self.demo[0]:
@@ -131,12 +131,12 @@ class Mapper(SLAMParameters):
                 self.run_viewer()
         self.demo[0] = 0
         
-        newcam = copy.deepcopy(self.shared_cam)
-        newcam.on_cuda()
+        newcam = copy.deepcopy(self.shared_cam)#深拷贝
+        newcam.on_cuda()#cuda
 
-        self.mapping_cams.append(newcam)
-        self.keyframe_idxs.append(newcam.cam_idx[0])
-        self.new_keyframes.append(len(self.mapping_cams)-1)
+        self.mapping_cams.append(newcam)#添加新的相机
+        self.keyframe_idxs.append(newcam.cam_idx[0])#添加新的关键帧
+        self.new_keyframes.append(len(self.mapping_cams)-1)#添加新的关键帧
 
         while True:
             if self.end_of_dataset[0]:
@@ -145,17 +145,17 @@ class Mapper(SLAMParameters):
             if self.verbose:
                 self.run_viewer()       
             
-            if self.is_tracking_keyframe_shared[0]:
+            if self.is_tracking_keyframe_shared[0]:#如果是跟踪关键帧共享
                 # get shared gaussians
-                points, colors, rots, scales, z_values, trackable_filter = self.shared_new_gaussians.get_values()
+                points, colors, rots, scales, z_values, trackable_filter = self.shared_new_gaussians.get_values()#获取共享内存中的新高斯点
                 
                 # Add new gaussians to map gaussians
-                self.gaussians.add_from_pcd2_tensor(points, colors, rots, scales, z_values, trackable_filter)
+                self.gaussians.add_from_pcd2_tensor(points, colors, rots, scales, z_values, trackable_filter)#从点云中添加高斯模型
 
                 # Allocate new target points to shared memory
-                target_points, target_rots, target_scales  = self.gaussians.get_trackable_gaussians_tensor(self.trackable_opacity_th)
-                self.shared_target_gaussians.input_values(target_points, target_rots, target_scales)
-                self.target_gaussians_ready[0] = 1
+                target_points, target_rots, target_scales  = self.gaussians.get_trackable_gaussians_tensor(self.trackable_opacity_th)#获取可跟踪的高斯模型
+                self.shared_target_gaussians.input_values(target_points, target_rots, target_scales)#输入值，包括目标点，目标旋转，目标尺度
+                self.target_gaussians_ready[0] = 1#目标高斯模型准备好了
 
                 # Add new keyframe
                 newcam = copy.deepcopy(self.shared_cam)
@@ -186,14 +186,14 @@ class Mapper(SLAMParameters):
                 # train once on new keyframe, and random
                 if len(self.new_keyframes) > 0:
                     train_idx = self.new_keyframes.pop(0)
-                    viewpoint_cam = self.mapping_cams[train_idx]
+                    viewpoint_cam = self.mapping_cams[train_idx]#视角相机
                 else:
                     train_idx = random.choice(range(len(self.mapping_cams)))
                     viewpoint_cam = self.mapping_cams[train_idx]
                 
                 if self.training_stage==0:
-                    gt_image = viewpoint_cam.original_image.cuda()
-                    gt_depth_image = viewpoint_cam.original_depth_image.cuda()
+                    gt_image = viewpoint_cam.original_image.cuda()#获取原始图像
+                    gt_depth_image = viewpoint_cam.original_depth_image.cuda()#获取原始深度图像
                 elif self.training_stage==1:
                     gt_image = viewpoint_cam.rgb_level_1.cuda()
                     gt_depth_image = viewpoint_cam.depth_level_1.cuda()
@@ -202,10 +202,10 @@ class Mapper(SLAMParameters):
                     gt_depth_image = viewpoint_cam.depth_level_2.cuda()
                 
                 self.training=True
-                render_pkg = render_3(viewpoint_cam, self.gaussians, self.pipe, self.background, training_stage=self.training_stage)
+                render_pkg = render_3(viewpoint_cam, self.gaussians, self.pipe, self.background, training_stage=self.training_stage)#渲染结果，这个里面包含了渲染的结果，深度图像，视图空间点张量，可见性过滤器，半径
                 
                 depth_image = render_pkg["render_depth"]
-                image = render_pkg["render"]
+                image = render_pkg["render"]#渲染结果
                 viewspace_point_tensor, visibility_filter, radii = render_pkg["viewspace_points"], render_pkg["visibility_filter"], render_pkg["radii"]
                 
                 mask = (gt_depth_image>0.)
@@ -214,16 +214,16 @@ class Mapper(SLAMParameters):
                 gt_image = gt_image * mask
                 
                 # Loss
-                Ll1_map, Ll1 = l1_loss(image, gt_image)
-                L_ssim_map, L_ssim = ssim(image, gt_image)
+                Ll1_map, Ll1 = l1_loss(image, gt_image)#l1损失
+                L_ssim_map, L_ssim = ssim(image, gt_image)#ssim损失
 
                 d_max = 10.
-                Ll1_d_map, Ll1_d = l1_loss(depth_image/d_max, gt_depth_image/d_max)
+                Ll1_d_map, Ll1_d = l1_loss(depth_image/d_max, gt_depth_image/d_max)#得到深度图像的l1损失
 
-                loss_rgb = (1.0 - self.lambda_dssim) * Ll1 + self.lambda_dssim * (1.0 - L_ssim)
-                loss_d = Ll1_d
+                loss_rgb = (1.0 - self.lambda_dssim) * Ll1 + self.lambda_dssim * (1.0 - L_ssim)#rgb损失
+                loss_d = Ll1_d#深度损失
                 
-                loss = loss_rgb + 0.1*loss_d
+                loss = loss_rgb + 0.1*loss_d#总损失
                 
                 loss.backward()
                 with torch.no_grad():
@@ -238,7 +238,7 @@ class Mapper(SLAMParameters):
                 # torch.cuda.empty_cache()
         if self.verbose:
             while True:
-                self.run_viewer(False)
+                self.run_viewer(False)#运行查看器
         
         # End of data
         if self.save_results:
@@ -250,7 +250,7 @@ class Mapper(SLAMParameters):
         if network_gui.conn == None:
             network_gui.try_connect()
         while network_gui.conn != None:
-            if time.time()-self.last_t < 1/self.viewer_fps and lower_speed:
+            if time.time()-self.last_t < 1/self.viewer_fps and lower_speed:#降低速度
                 break
             try:
                 net_image_bytes = None

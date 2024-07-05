@@ -124,7 +124,9 @@ class SharedTargetPoints(nn.Module):
         return  copy.deepcopy(self.xyz[:self.using_idx[0],:].numpy()),\
                 copy.deepcopy(self.rots[:self.using_idx[0],:].numpy()),\
                 copy.deepcopy(self.scales[:self.using_idx[0],:].numpy())
-
+"""
+这里做到的是将相机的参数和图像信息都放在了一个类里面，这样就可以直接调用这个类来获取相机的参数和图像信息
+"""
 class SharedCam(nn.Module):
     def __init__(self, FoVx, FoVy, image, depth_image,
                  cx, cy, fx, fy,
@@ -142,13 +144,13 @@ class SharedCam(nn.Module):
         self.fx = torch.tensor([fx])
         self.fy = torch.tensor([fy])
         
-        self.original_image = torch.from_numpy(image).float().permute(2,0,1)/255
+        self.original_image = torch.from_numpy(image).float().permute(2,0,1)/255 #获取图像信息
         # rgb_level_1 = cv2.resize(image, (self.image_width//2, self.image_height//2))
         # rgb_level_2 = cv2.resize(image, (self.image_width//4, self.image_height//4))
         # self.rgb_level_1 = torch.from_numpy(rgb_level_1).float().cuda().permute(2,0,1)/255
         # self.rgb_level_2 = torch.from_numpy(rgb_level_2).float().cuda().permute(2,0,1)/255
         
-        self.original_depth_image = torch.from_numpy(depth_image).float().unsqueeze(0)
+        self.original_depth_image = torch.from_numpy(depth_image).float().unsqueeze(0)#获取深度图像信息
         # depth_level_1 = cv2.resize(depth_image, (self.image_width//2, self.image_height//2), interpolation=cv2.INTER_NEAREST)
         # depth_level_2 = cv2.resize(depth_image, (self.image_width//4, self.image_height//4), interpolation=cv2.INTER_NEAREST)
         # self.depth_level_1 = torch.from_numpy(depth_level_1).float().unsqueeze(0).cuda()
@@ -160,18 +162,18 @@ class SharedCam(nn.Module):
         self.trans = trans
         self.scale = scale
 
-        self.world_view_transform = getWorld2View2(self.R, self.t, trans, scale).transpose(0, 1)
-        self.projection_matrix = getProjectionMatrix(znear=self.znear, zfar=self.zfar, fovX=self.FoVx, fovY=self.FoVy).transpose(0,1)
-        self.full_proj_transform = (self.world_view_transform.unsqueeze(0).bmm(self.projection_matrix.unsqueeze(0))).squeeze(0)
-        self.camera_center = self.world_view_transform.inverse()[3, :3]
+        self.world_view_transform = getWorld2View2(self.R, self.t, trans, scale).transpose(0, 1)#根据旋转信息和平移信息获取相机的世界坐标系到相机坐标系的变换矩阵
+        self.projection_matrix = getProjectionMatrix(znear=self.znear, zfar=self.zfar, fovX=self.FoVx, fovY=self.FoVy).transpose(0,1)#获取投影矩阵
+        self.full_proj_transform = (self.world_view_transform.unsqueeze(0).bmm(self.projection_matrix.unsqueeze(0))).squeeze(0)#获取完整的变换矩阵
+        self.camera_center = self.world_view_transform.inverse()[3, :3]#获取相机的中心点
         
-    def update_matrix(self):
+    def update_matrix(self):#更新相机的参数
         self.world_view_transform[:,:] = getWorld2View2(self.R, self.t, self.trans, self.scale).transpose(0, 1)
         # self.projection_matrix = getProjectionMatrix(znear=self.znear, zfar=self.zfar, fovX=self.FoVx, fovY=self.FoVy).transpose(0,1).cuda()
         self.full_proj_transform[:,:] = (self.world_view_transform.unsqueeze(0).bmm(self.projection_matrix.unsqueeze(0))).squeeze(0)
         self.camera_center[:] = self.world_view_transform.inverse()[3, :3]
     
-    def setup_cam(self, R, t, rgb_img, depth_img):
+    def setup_cam(self, R, t, rgb_img, depth_img):#设置相机的参数
         # Set pose, projection matrix
         self.R[:,:] = torch.from_numpy(R)
         self.t[:] = torch.from_numpy(t)
@@ -180,7 +182,7 @@ class SharedCam(nn.Module):
         self.original_image[:,:,:] = torch.from_numpy(rgb_img).float().permute(2,0,1)/255
         self.original_depth_image[:,:,:] = torch.from_numpy(depth_img).float().unsqueeze(0)
     
-    def on_cuda(self):
+    def on_cuda(self):#将所有的数据放到cuda上
         self.world_view_transform = self.world_view_transform.cuda()
         self.projection_matrix = self.projection_matrix.cuda()
         self.full_proj_transform = self.full_proj_transform.cuda()

@@ -19,73 +19,80 @@ from mp_Mapper import Mapper
 
 torch.multiprocessing.set_sharing_strategy('file_system')
 
+"""
+设置管道信息
+"""
 class Pipe():
+    # 初始化传入三个参数：convert_SHs_python：将SHs转换为点云，compute_cov3D_python：计算3D协方差矩阵，debug：是否开启debug模式
     def __init__(self, convert_SHs_python, compute_cov3D_python, debug):
         self.convert_SHs_python = convert_SHs_python
         self.compute_cov3D_python = compute_cov3D_python
         self.debug = debug
-        
+
+"""
+GS ICP主要的高斯溅射类，继承自SLAMParameters
+"""
 class GS_ICP_SLAM(SLAMParameters):
-    def __init__(self, args):
+    def __init__(self, args): # 初始化函数
         super().__init__()
-        self.dataset_path = args.dataset_path
-        self.config = args.config
-        self.output_path = args.output_path
-        os.makedirs(self.output_path, exist_ok=True)
-        self.verbose = args.verbose
-        self.keyframe_th = float(args.keyframe_th)
-        self.knn_max_distance = float(args.knn_maxd)
-        self.overlapped_th = float(args.overlapped_th)
-        self.max_correspondence_distance = float(args.max_correspondence_distance)
-        self.trackable_opacity_th = float(args.trackable_opacity_th)
-        self.overlapped_th2 = float(args.overlapped_th2)
-        self.downsample_rate = int(args.downsample_rate)
-        self.test = args.test
-        self.save_results = args.save_results
+        self.dataset_path = args.dataset_path # 数据集路径
+        self.config = args.config # 相机参数路径
+        self.output_path = args.output_path # 输出路径
+        os.makedirs(self.output_path, exist_ok=True)# 创建输出路径
+        self.verbose = args.verbose # 是否开启verbose模式
+        self.keyframe_th = float(args.keyframe_th) # 关键帧阈值
+        self.knn_max_distance = float(args.knn_maxd) # knn最大距离
+        self.overlapped_th = float(args.overlapped_th) # 重叠阈值
+        self.max_correspondence_distance = float(args.max_correspondence_distance)# 最大对应距离
+        self.trackable_opacity_th = float(args.trackable_opacity_th)# 可跟踪的透明度阈值
+        self.overlapped_th2 = float(args.overlapped_th2)# 重叠阈值2
+        self.downsample_rate = int(args.downsample_rate) # 下采样率
+        self.test = args.test # 测试
+        self.save_results = args.save_results # 是否保存结果
         
-        camera_parameters_file = open(self.config)
-        camera_parameters_ = camera_parameters_file.readlines()
-        self.camera_parameters = camera_parameters_[2].split()
-        self.W = int(self.camera_parameters[0])
-        self.H = int(self.camera_parameters[1])
-        self.fx = float(self.camera_parameters[2])
-        self.fy = float(self.camera_parameters[3])
-        self.cx = float(self.camera_parameters[4])
-        self.cy = float(self.camera_parameters[5])
-        self.depth_scale = float(self.camera_parameters[6])
-        self.depth_trunc = float(self.camera_parameters[7])
-        self.downsample_idxs, self.x_pre, self.y_pre = self.set_downsample_filter(self.downsample_rate)
+        camera_parameters_file = open(self.config)# 打开相机参数文件
+        camera_parameters_ = camera_parameters_file.readlines() # 读取相机参数文件
+        self.camera_parameters = camera_parameters_[2].split() # 获取相机参数
+        self.W = int(self.camera_parameters[0]) # 图像宽度
+        self.H = int(self.camera_parameters[1]) # 图像高度
+        self.fx = float(self.camera_parameters[2]) # fx
+        self.fy = float(self.camera_parameters[3]) # fy
+        self.cx = float(self.camera_parameters[4]) # cx
+        self.cy = float(self.camera_parameters[5]) # cy
+        self.depth_scale = float(self.camera_parameters[6]) # 深度缩放
+        self.depth_trunc = float(self.camera_parameters[7]) # 深度截断
+        self.downsample_idxs, self.x_pre, self.y_pre = self.set_downsample_filter(self.downsample_rate) # 下采样索引，x_pre，y_pre
         
         try:
-            mp.set_start_method('spawn', force=True)
+            mp.set_start_method('spawn', force=True) # 设置启动方法, 强制使用spawn
         except RuntimeError:
             pass
         
-        self.trajmanager = TrajManager(self.camera_parameters[8], self.dataset_path)
+        self.trajmanager = TrajManager(self.camera_parameters[8], self.dataset_path) # 轨迹管理器,将路径下的轨迹文件读取出来，一个1*3的轨迹矩阵
         
         # Make test cam
         # To get memory sizes of shared_cam
-        test_rgb_img, test_depth_img = self.get_test_image(f"{self.dataset_path}/images")
-        test_points, _, _, _ = self.downsample_and_make_pointcloud(test_depth_img, test_rgb_img)
+        test_rgb_img, test_depth_img = self.get_test_image(f"{self.dataset_path}/images")# 获取测试图像
+        test_points, _, _, _ = self.downsample_and_make_pointcloud(test_depth_img, test_rgb_img)# 下采样并生成点云，这里面就是深度信息的点云图
 
         # Get size of final poses
-        num_final_poses = len(self.trajmanager.gt_poses)
+        num_final_poses = len(self.trajmanager.gt_poses)# 获取轨迹的长度
         
         # Shared objects
         self.shared_cam = SharedCam(FoVx=focal2fov(self.fx, self.W), FoVy=focal2fov(self.fy, self.H),
                                     image=test_rgb_img, depth_image=test_depth_img,
-                                    cx=self.cx, cy=self.cy, fx=self.fx, fy=self.fy)
-        self.shared_new_points = SharedPoints(test_points.shape[0])
-        self.shared_new_gaussians = SharedGaussians(test_points.shape[0])
-        self.shared_target_gaussians = SharedTargetPoints(10000000)
-        self.end_of_dataset = torch.zeros((1)).int()
-        self.is_tracking_keyframe_shared = torch.zeros((1)).int()
-        self.is_mapping_keyframe_shared = torch.zeros((1)).int()
-        self.target_gaussians_ready = torch.zeros((1)).int()
-        self.new_points_ready = torch.zeros((1)).int()
-        self.final_pose = torch.zeros((num_final_poses,4,4)).float()
-        self.demo = torch.zeros((1)).int()
-        self.is_mapping_process_started = torch.zeros((1)).int()
+                                    cx=self.cx, cy=self.cy, fx=self.fx, fy=self.fy)# 共享相机参数
+        self.shared_new_points = SharedPoints(test_points.shape[0])# 共享新的点
+        self.shared_new_gaussians = SharedGaussians(test_points.shape[0])# 共享新的高斯
+        self.shared_target_gaussians = SharedTargetPoints(10000000)# 共享目标高斯
+        self.end_of_dataset = torch.zeros((1)).int()# 数据集结束
+        self.is_tracking_keyframe_shared = torch.zeros((1)).int()# 跟踪关键帧共享
+        self.is_mapping_keyframe_shared = torch.zeros((1)).int()# 映射关键帧共享
+        self.target_gaussians_ready = torch.zeros((1)).int()# 目标高斯准备
+        self.new_points_ready = torch.zeros((1)).int()# 新的点准备
+        self.final_pose = torch.zeros((num_final_poses,4,4)).float()# 最终姿态
+        self.demo = torch.zeros((1)).int()# 演示
+        self.is_mapping_process_started = torch.zeros((1)).int()# 映射进程开始
         
         self.shared_cam.share_memory()
         self.shared_new_points.share_memory()
@@ -101,35 +108,41 @@ class GS_ICP_SLAM(SLAMParameters):
         self.is_mapping_process_started.share_memory_()
         
         self.demo[0] = args.demo
-        self.mapper = Mapper(self)
-        self.tracker = Tracker(self)
+        self.mapper = Mapper(self)#建图参数
+        self.tracker = Tracker(self)#跟踪参数
 
+    """
+    跟踪线程执行
+    """
     def tracking(self, rank):
         self.tracker.run()
     
+    """
+    建图线程执行
+    """
     def mapping(self, rank):
         self.mapper.run()
 
-    def run(self):
+    def run(self):# 运行
         processes = []
         for rank in range(2):
             if rank == 0:
-                p = mp.Process(target=self.tracking, args=(rank, ))
+                p = mp.Process(target=self.tracking, args=(rank, ))# 跟踪
             elif rank == 1:
-                p = mp.Process(target=self.mapping, args=(rank, )) 
+                p = mp.Process(target=self.mapping, args=(rank, )) # 建图
             p.start()
-            processes.append(p)
+            processes.append(p)# 添加进程
         for p in processes:
             p.join()
 
-    def get_test_image(self, images_folder):
+    def get_test_image(self, images_folder): # 获取测试图像
         
         if self.camera_parameters[8] == "replica":
-            images_folder = os.path.join(self.dataset_path, "images")
-            image_files = os.listdir(images_folder)
-            image_files = sorted(image_files.copy())
-            image_name = image_files[0].split(".")[0]
-            depth_image_name = f"depth{image_name[5:]}"
+            images_folder = os.path.join(self.dataset_path, "images")# 获取图像文件夹
+            image_files = os.listdir(images_folder)# 获取图像文件
+            image_files = sorted(image_files.copy())# 对图像文件进行排序
+            image_name = image_files[0].split(".")[0]# 获取图像名称
+            depth_image_name = f"depth{image_name[5:]}"#深度图像名称
             rgb_image = cv2.imread(f"{self.dataset_path}/images/{image_name}.jpg")
             depth_image = np.array(o3d.io.read_image(f"{self.dataset_path}/depth_images/{depth_image_name}.png")).astype(np.float32)
         elif self.camera_parameters[8] == "tum":
@@ -142,7 +155,7 @@ class GS_ICP_SLAM(SLAMParameters):
         
         return rgb_image, depth_image
 
-    def run_viewer(self, lower_speed=True):
+    def run_viewer(self, lower_speed=True):# 运行查看器
         if network_gui.conn == None:
             network_gui.try_connect()
         while network_gui.conn != None:
@@ -166,45 +179,48 @@ class GS_ICP_SLAM(SLAMParameters):
             except Exception as e:
                 network_gui.conn = None
 
+    """
+    设置下采样滤波器
+    """
     def set_downsample_filter( self, downsample_scale):
         # Get sampling idxs
-        sample_interval = downsample_scale
-        h_val = sample_interval * torch.arange(0,int(self.H/sample_interval)+1)
-        h_val = h_val-1
-        h_val[0] = 0
-        h_val = h_val*self.W
-        a, b = torch.meshgrid(h_val, torch.arange(0,self.W,sample_interval))
+        sample_interval = downsample_scale# 下采样比例
+        h_val = sample_interval * torch.arange(0,int(self.H/sample_interval)+1)# 采样间隔*采样比例（torch.arange目的是生成一个等差数列）
+        h_val = h_val-1# 采样间隔-1，变成-1，0，1这样的形式，原因之前是做了+1的操作
+        h_val[0] = 0# 第一个值设置为0
+        h_val = h_val*self.W# 采样间隔,计算为采样比例
+        a, b = torch.meshgrid(h_val, torch.arange(0,self.W,sample_interval))# 生成网格，按照计算出来的h_val和W/scale_interval来生成网格
         # For tensor indexing, we need tuple
-        pick_idxs = ((a+b).flatten(),)
+        pick_idxs = ((a+b).flatten(),)# 生成索引
         # Get u, v values
         v, u = torch.meshgrid(torch.arange(0,self.H), torch.arange(0,self.W))
-        u = u.flatten()[pick_idxs]
-        v = v.flatten()[pick_idxs]
+        u = u.flatten()[pick_idxs]# 生成u值
+        v = v.flatten()[pick_idxs]# 生成v值
         
-        # Calculate xy values, not multiplied with z_values
+        # 计算xy值，不乘以z值
         x_pre = (u-self.cx)/self.fx # * z_values
         y_pre = (v-self.cy)/self.fy # * z_values
         
         return pick_idxs, x_pre, y_pre
 
-    def downsample_and_make_pointcloud(self, depth_img, rgb_img):
+    def downsample_and_make_pointcloud(self, depth_img, rgb_img):# 下采样并生成点云
         
-        colors = torch.from_numpy(rgb_img).reshape(-1,3).float()[self.downsample_idxs]/255
-        z_values = torch.from_numpy(depth_img.astype(np.float32)).flatten()[self.downsample_idxs]/self.depth_scale
-        filter = torch.where((z_values!=0)&(z_values<=self.depth_trunc))
+        colors = torch.from_numpy(rgb_img).reshape(-1,3).float()[self.downsample_idxs]/255# 颜色信息
+        z_values = torch.from_numpy(depth_img.astype(np.float32)).flatten()[self.downsample_idxs]/self.depth_scale # 深度信息
+        filter = torch.where((z_values!=0)&(z_values<=self.depth_trunc)) # 过滤条件
         # print(z_values[filter].min())
         # Trackable gaussians (will be used in tracking)
         z_values = z_values
-        x = self.x_pre * z_values
+        x = self.x_pre * z_values#通过x_pre和z_values计算真实深度下的x值
         y = self.y_pre * z_values
-        points = torch.stack([x,y,z_values], dim=-1)
-        colors = colors
+        points = torch.stack([x,y,z_values], dim=-1)# 点云信息
+        colors = colors #颜色信息
         
         # untrackable gaussians (won't be used in tracking, but will be used in 3DGS)
         
         return points.numpy(), colors.numpy(), z_values.numpy(), filter[0].numpy()
     
-    def get_image_dirs(self, images_folder):
+    def get_image_dirs(self, images_folder):# 获取图像文件夹
         if self.camera_parameters[8] == "replica":
             images_folder = os.path.join(self.dataset_path, "images")
             image_files = os.listdir(images_folder)
