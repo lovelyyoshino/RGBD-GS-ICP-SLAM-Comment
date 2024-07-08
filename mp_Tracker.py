@@ -36,10 +36,10 @@ class Tracker(SLAMParameters):
         self.camera_parameters = slam.camera_parameters
         self.W = slam.W
         self.H = slam.H
-        self.fx = slam.fx
-        self.fy = slam.fy
-        self.cx = slam.cx
-        self.cy = slam.cy
+        # self.fx = slam.fx
+        # self.fy = slam.fy
+        # self.cx = slam.cx
+        # self.cy = slam.cy
         self.depth_scale = slam.depth_scale#深度缩放
         self.depth_trunc = slam.depth_trunc#深度截断
         
@@ -69,7 +69,7 @@ class Tracker(SLAMParameters):
         self.from_last_mapping_keyframe = 0
         self.scene_extent = 2.5
         
-        self.downsample_idxs, self.x_pre, self.y_pre = self.set_downsample_filter(self.downsample_rate)
+        # self.downsample_idxs, self.x_pre, self.y_pre = self.set_downsample_filter(self.downsample_rate)
 
         # Share
         self.train_iter = 0
@@ -93,10 +93,11 @@ class Tracker(SLAMParameters):
     def run(self):
         self.tracking()
     
-    def tracking(self):
+    def tracking(self,process_synced_data=None):
         tt = torch.zeros((1,1)).float().cuda()#创建一个全0的张量
-        self.rgb_images, self.depth_images = self.get_images(f"{self.dataset_path}/images")#获取图片和深度图
-        self.num_images = len(self.rgb_images)#图片数量
+        # self.rgb_images, self.depth_images = self.get_images(f"{self.dataset_path}/images")#获取图片和深度图
+        self.process_synced_data = process_synced_data
+        # self.num_images = len(self.rgb_images)#图片数量
         self.reg.set_max_correspondence_distance(self.max_correspondence_distance)#设置最大对应距离
         self.reg.set_max_knn_distance(self.knn_max_distance)#设置最大knn距离
         if_mapping_keyframe = False
@@ -106,18 +107,21 @@ class Tracker(SLAMParameters):
         #     time.sleep(0.01)
 
         self.total_start_time = time.time()
-        pbar = tqdm(total=self.num_images)#进度条
+        pbar = tqdm(total=len(self.process_synced_data))#进度条
 
-        for ii in range(self.num_images):#遍历图片和深度图
-            current_image = self.rgb_images.pop(0)
-            depth_image = self.depth_images.pop(0)
+        for ii in range(len(self.process_synced_data)):#遍历图片和深度图
+            # current_image = self.rgb_images.pop(0)
+            # depth_image = self.depth_images.pop(0)
 
-            if self.verbose:
-                cv2.imshow("Current image", current_image)
-                cv2.waitKey(1)
-            current_image = cv2.cvtColor(current_image, cv2.COLOR_RGB2BGR)
-            # Make pointcloud
-            points, colors, z_values, trackable_filter = self.downsample_and_make_pointcloud2(depth_image, current_image)#下采样并生成点云，当中是有点云信息的
+            # if self.verbose:
+            #     cv2.imshow("Current image", current_image)
+            #     cv2.waitKey(1)
+            # current_image = cv2.cvtColor(current_image, cv2.COLOR_RGB2BGR)
+            # # Make pointcloud
+            # points, colors, z_values, trackable_filter = self.downsample_and_make_pointcloud2(depth_image, current_image)#下采样并生成点云，当中是有点云信息的
+            points, colors, z_values, trackable_filter = self.downsample_and_make_pointcloud2(self.process_synced_data)
+            
+            
             # GICP
             if self.iteration_images == 0:
                 current_pose = self.poses[-1]
@@ -150,8 +154,8 @@ class Tracker(SLAMParameters):
                                                        torch.tensor(z_values), torch.tensor(trackable_filter))#输入高斯，当中包含有点云信息、颜色、旋转、尺度、z值和过滤器
                 
                 # Add first keyframe
-                depth_image = depth_image.astype(np.float32)/self.depth_scale#深度图
-                self.shared_cam.setup_cam(R, T, current_image, depth_image)#设置相机
+                # depth_image = depth_image.astype(np.float32)/self.depth_scale#深度图
+                self.shared_cam.setup_cam(R, T)#设置相机
                 self.shared_cam.cam_idx[0] = self.iteration_images#相机索引
                 
                 self.is_tracking_keyframe_shared[0] = 1
@@ -224,8 +228,8 @@ class Tracker(SLAMParameters):
                                                        torch.tensor(z_values), torch.tensor(trackable_filter))
 
                     # Add new keyframe
-                    depth_image = depth_image.astype(np.float32)/self.depth_scale
-                    self.shared_cam.setup_cam(R, T, current_image, depth_image)#设置相机
+                    # depth_image = depth_image.astype(np.float32)/self.depth_scale
+                    self.shared_cam.setup_cam(R, T)#设置相机
                     self.shared_cam.cam_idx[0] = self.iteration_images#相机索引
                     
                     self.is_tracking_keyframe_shared[0] = 1
@@ -257,8 +261,8 @@ class Tracker(SLAMParameters):
                                                        torch.tensor(z_values), torch.tensor(trackable_filter))
                     
                     # Add new keyframe
-                    depth_image = depth_image.astype(np.float32)/self.depth_scale
-                    self.shared_cam.setup_cam(R, T, current_image, depth_image)
+                    # depth_image = depth_image.astype(np.float32)/self.depth_scale
+                    self.shared_cam.setup_cam(R, T)
                     self.shared_cam.cam_idx[0] = self.iteration_images
                     
                     self.is_mapping_keyframe_shared[0] = 1#映射关键帧共享
@@ -356,24 +360,33 @@ class Tracker(SLAMParameters):
         
         return pick_idxs, x_pre, y_pre
 
-    def downsample_and_make_pointcloud2(self, depth_img, rgb_img):
+    # def downsample_and_make_pointcloud2(self, depth_img, rgb_img):
         
-        colors = torch.from_numpy(rgb_img).reshape(-1,3).float()[self.downsample_idxs]/255
-        z_values = torch.from_numpy(depth_img.astype(np.float32)).flatten()[self.downsample_idxs]/self.depth_scale
-        zero_filter = torch.where(z_values!=0)
-        filter = torch.where(z_values[zero_filter]<=self.depth_trunc)
-        # print(z_values[filter].min())
-        # Trackable gaussians (will be used in tracking)
-        z_values = z_values[zero_filter]
-        x = self.x_pre[zero_filter] * z_values
-        y = self.y_pre[zero_filter] * z_values
-        points = torch.stack([x,y,z_values], dim=-1)
-        colors = colors[zero_filter]
+    #     colors = torch.from_numpy(rgb_img).reshape(-1,3).float()[self.downsample_idxs]/255
+    #     z_values = torch.from_numpy(depth_img.astype(np.float32)).flatten()[self.downsample_idxs]/self.depth_scale
+    #     zero_filter = torch.where(z_values!=0)
+    #     filter = torch.where(z_values[zero_filter]<=self.depth_trunc)
+    #     # print(z_values[filter].min())
+    #     # Trackable gaussians (will be used in tracking)
+    #     z_values = z_values[zero_filter]
+    #     x = self.x_pre[zero_filter] * z_values
+    #     y = self.y_pre[zero_filter] * z_values
+    #     points = torch.stack([x,y,z_values], dim=-1)
+    #     colors = colors[zero_filter]
         
         # untrackable gaussians (won't be used in tracking, but will be used in 3DGS)
         
         return points.numpy(), colors.numpy(), z_values.numpy(), filter[0].numpy()
     
+    def downsample_and_make_pointcloud2(self, points_np):
+        points = torch.from_numpy(points_np[:, :3])
+        colors = torch.from_numpy(points_np[:, 3:])
+        z_values = torch.from_numpy(points_np[:, 2])
+        filter = torch.where((z_values!=0)&(z_values<=self.depth_trunc)) # 过滤条件
+        return points.numpy(), colors.numpy(), z_values.numpy(), filter[0].numpy()
+
+
+
     def eliminate_overlapped2(self, distances, threshold):
         
         # plt.hist(distances, bins=np.arange(0.,0.003,0.00001))

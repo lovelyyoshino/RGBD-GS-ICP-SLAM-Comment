@@ -39,10 +39,10 @@ class Mapper(SLAMParameters):
         self.camera_parameters = slam.camera_parameters
         self.W = slam.W
         self.H = slam.H
-        self.fx = slam.fx
-        self.fy = slam.fy
-        self.cx = slam.cx
-        self.cy = slam.cy
+        # self.fx = slam.fx
+        # self.fy = slam.fy
+        # self.cx = slam.cx
+        # self.cy = slam.cy
         self.depth_scale = slam.depth_scale
         self.depth_trunc = slam.depth_trunc
         
@@ -77,7 +77,7 @@ class Mapper(SLAMParameters):
         else:
             self.prune_th = 10.0
         
-        self.downsample_idxs, self.x_pre, self.y_pre = self.set_downsample_filter(self.downsample_rate)
+        # self.downsample_idxs, self.x_pre, self.y_pre = self.set_downsample_filter(self.downsample_rate)
 
         self.gaussians = GaussianModel(self.sh_degree)
         self.pipe = Pipe(self.convert_SHs_python, self.compute_cov3D_python, self.debug)
@@ -244,7 +244,7 @@ class Mapper(SLAMParameters):
         if self.save_results:
             self.gaussians.save_ply(os.path.join(self.output_path, "scene.ply"))
         
-        self.calc_2d_metric()
+        # self.calc_2d_metric()
     
     def run_viewer(self, lower_speed=True):
         if network_gui.conn == None:
@@ -270,26 +270,26 @@ class Mapper(SLAMParameters):
             except Exception as e:
                 network_gui.conn = None
 
-    def set_downsample_filter( self, downsample_scale):
-        # Get sampling idxs
-        sample_interval = downsample_scale
-        h_val = sample_interval * torch.arange(0,int(self.H/sample_interval)+1)
-        h_val = h_val-1
-        h_val[0] = 0
-        h_val = h_val*self.W
-        a, b = torch.meshgrid(h_val, torch.arange(0,self.W,sample_interval))
-        # For tensor indexing, we need tuple
-        pick_idxs = ((a+b).flatten(),)
-        # Get u, v values
-        v, u = torch.meshgrid(torch.arange(0,self.H), torch.arange(0,self.W))
-        u = u.flatten()[pick_idxs]
-        v = v.flatten()[pick_idxs]
+    # def set_downsample_filter( self, downsample_scale):
+    #     # Get sampling idxs
+    #     sample_interval = downsample_scale
+    #     h_val = sample_interval * torch.arange(0,int(self.H/sample_interval)+1)
+    #     h_val = h_val-1
+    #     h_val[0] = 0
+    #     h_val = h_val*self.W
+    #     a, b = torch.meshgrid(h_val, torch.arange(0,self.W,sample_interval))
+    #     # For tensor indexing, we need tuple
+    #     pick_idxs = ((a+b).flatten(),)
+    #     # Get u, v values
+    #     v, u = torch.meshgrid(torch.arange(0,self.H), torch.arange(0,self.W))
+    #     u = u.flatten()[pick_idxs]
+    #     v = v.flatten()[pick_idxs]
         
-        # Calculate xy values, not multiplied with z_values
-        x_pre = (u-self.cx)/self.fx # * z_values
-        y_pre = (v-self.cy)/self.fy # * z_values
+    #     # Calculate xy values, not multiplied with z_values
+    #     x_pre = (u-self.cx)/self.fx # * z_values
+    #     y_pre = (v-self.cy)/self.fy # * z_values
         
-        return pick_idxs, x_pre, y_pre
+        # return pick_idxs, x_pre, y_pre
     
     def get_image_dirs(self, images_folder):
         color_paths = []
@@ -309,92 +309,92 @@ class Mapper(SLAMParameters):
             return self.trajmanager.color_paths, self.trajmanager.depth_paths
 
     
-    def calc_2d_metric(self):
-        psnrs = []
-        ssims = []
-        lpips = []
+    # def calc_2d_metric(self):
+    #     psnrs = []
+    #     ssims = []
+    #     lpips = []
         
-        cal_lpips = LearnedPerceptualImagePatchSimilarity(net_type='alex', normalize=True).to("cuda")
-        original_resolution = True
-        image_names, depth_image_names = self.get_image_dirs(self.dataset_path)
-        final_poses = self.final_pose
-        fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+    #     cal_lpips = LearnedPerceptualImagePatchSimilarity(net_type='alex', normalize=True).to("cuda")
+    #     original_resolution = True
+    #     image_names, depth_image_names = self.get_image_dirs(self.dataset_path)
+    #     final_poses = self.final_pose
+    #     fig, axs = plt.subplots(1, 2, figsize=(10, 5))
         
-        with torch.no_grad():
-            for i in tqdm(range(len(image_names))):
-                gt_depth_ = []
-                cam = self.mapping_cams[0]
-                c2w = final_poses[i]
+    #     with torch.no_grad():
+    #         for i in tqdm(range(len(image_names))):
+    #             gt_depth_ = []
+    #             cam = self.mapping_cams[0]
+    #             c2w = final_poses[i]
                 
-                if original_resolution:
-                    gt_rgb = cv2.imread(image_names[i])
-                    gt_depth = cv2.imread(depth_image_names[i] ,cv2.IMREAD_UNCHANGED).astype(np.float32)
+    #             if original_resolution:
+    #                 gt_rgb = cv2.imread(image_names[i])
+    #                 gt_depth = cv2.imread(depth_image_names[i] ,cv2.IMREAD_UNCHANGED).astype(np.float32)
                     
-                    gt_rgb = cv2.cvtColor(gt_rgb, cv2.COLOR_RGB2BGR)
-                    gt_rgb = gt_rgb/255
-                    gt_rgb_ = torch.from_numpy(gt_rgb).float().cuda().permute(2,0,1)
+    #                 gt_rgb = cv2.cvtColor(gt_rgb, cv2.COLOR_RGB2BGR)
+    #                 gt_rgb = gt_rgb/255
+    #                 gt_rgb_ = torch.from_numpy(gt_rgb).float().cuda().permute(2,0,1)
                     
-                    gt_depth_ = torch.from_numpy(gt_depth).float().cuda().unsqueeze(0)
-                else:
-                    gt_rgb_ = cam.original_image.cuda()
-                    gt_rgb = np.asarray(gt_rgb_.detach().cpu()).squeeze().transpose((1,2,0))
-                    gt_depth_ = cam.original_depth_image.cuda()
-                    gt_depth = np.asarray(cam.original_depth_image.detach().cpu()).squeeze()
+    #                 gt_depth_ = torch.from_numpy(gt_depth).float().cuda().unsqueeze(0)
+    #             else:
+    #                 gt_rgb_ = cam.original_image.cuda()
+    #                 gt_rgb = np.asarray(gt_rgb_.detach().cpu()).squeeze().transpose((1,2,0))
+    #                 gt_depth_ = cam.original_depth_image.cuda()
+    #                 gt_depth = np.asarray(cam.original_depth_image.detach().cpu()).squeeze()
                 
-                w2c = np.linalg.inv(c2w)
-                # rendered
-                R = w2c[:3,:3].transpose()
-                T = w2c[:3,3]
+    #             w2c = np.linalg.inv(c2w)
+    #             # rendered
+    #             R = w2c[:3,:3].transpose()
+    #             T = w2c[:3,3]
                 
-                cam.R = torch.tensor(R)
-                cam.t = torch.tensor(T)
-                if original_resolution:
-                    cam.image_width = gt_rgb_.shape[2]
-                    cam.image_height = gt_rgb_.shape[1]
-                else:
-                    pass
+    #             cam.R = torch.tensor(R)
+    #             cam.t = torch.tensor(T)
+    #             if original_resolution:
+    #                 cam.image_width = gt_rgb_.shape[2]
+    #                 cam.image_height = gt_rgb_.shape[1]
+    #             else:
+    #                 pass
                 
-                cam.update_matrix()
-                # rendered rgb
-                ours_rgb_ = render(cam, self.gaussians, self.pipe, self.background)["render"]
-                ours_rgb_ = torch.clamp(ours_rgb_, 0., 1.).cuda()
+    #             cam.update_matrix()
+    #             # rendered rgb
+    #             ours_rgb_ = render(cam, self.gaussians, self.pipe, self.background)["render"]
+    #             ours_rgb_ = torch.clamp(ours_rgb_, 0., 1.).cuda()
                 
-                valid_depth_mask_ = (gt_depth_>0)
+    #             valid_depth_mask_ = (gt_depth_>0)
                 
-                gt_rgb_ = gt_rgb_ * valid_depth_mask_
-                ours_rgb_ = ours_rgb_ * valid_depth_mask_
+    #             gt_rgb_ = gt_rgb_ * valid_depth_mask_
+    #             ours_rgb_ = ours_rgb_ * valid_depth_mask_
                 
-                square_error = (gt_rgb_-ours_rgb_)**2
-                mse_error = torch.mean(torch.mean(square_error, axis=2))
-                psnr = mse2psnr(mse_error)
+    #             square_error = (gt_rgb_-ours_rgb_)**2
+    #             mse_error = torch.mean(torch.mean(square_error, axis=2))
+    #             psnr = mse2psnr(mse_error)
                 
-                psnrs += [psnr.detach().cpu()]
-                _, ssim_error = ssim(ours_rgb_, gt_rgb_)
-                ssims += [ssim_error.detach().cpu()]
-                lpips_value = cal_lpips(gt_rgb_.unsqueeze(0), ours_rgb_.unsqueeze(0))
-                lpips += [lpips_value.detach().cpu()]
+    #             psnrs += [psnr.detach().cpu()]
+    #             _, ssim_error = ssim(ours_rgb_, gt_rgb_)
+    #             ssims += [ssim_error.detach().cpu()]
+    #             lpips_value = cal_lpips(gt_rgb_.unsqueeze(0), ours_rgb_.unsqueeze(0))
+    #             lpips += [lpips_value.detach().cpu()]
                 
-                if self.save_results and ((i+1)%100==0 or i==len(image_names)-1):
-                    ours_rgb = np.asarray(ours_rgb_.detach().cpu()).squeeze().transpose((1,2,0))
+    #             if self.save_results and ((i+1)%100==0 or i==len(image_names)-1):
+    #                 ours_rgb = np.asarray(ours_rgb_.detach().cpu()).squeeze().transpose((1,2,0))
                     
-                    axs[0].set_title("gt rgb")
-                    axs[0].imshow(gt_rgb)
-                    axs[0].axis("off")
-                    axs[1].set_title("rendered rgb")
-                    axs[1].imshow(ours_rgb)
-                    axs[1].axis("off")
-                    plt.suptitle(f'{i+1} frame')
-                    plt.pause(1e-15)
-                    plt.savefig(f"{self.output_path}/result_{i}.png")
-                    plt.cla()
+    #                 axs[0].set_title("gt rgb")
+    #                 axs[0].imshow(gt_rgb)
+    #                 axs[0].axis("off")
+    #                 axs[1].set_title("rendered rgb")
+    #                 axs[1].imshow(ours_rgb)
+    #                 axs[1].axis("off")
+    #                 plt.suptitle(f'{i+1} frame')
+    #                 plt.pause(1e-15)
+    #                 plt.savefig(f"{self.output_path}/result_{i}.png")
+    #                 plt.cla()
                 
-                torch.cuda.empty_cache()
+    #             torch.cuda.empty_cache()
             
-            psnrs = np.array(psnrs)
-            ssims = np.array(ssims)
-            lpips = np.array(lpips)
+    #         psnrs = np.array(psnrs)
+    #         ssims = np.array(ssims)
+    #         lpips = np.array(lpips)
             
-            print(f"PSNR: {psnrs.mean():.2f}\nSSIM: {ssims.mean():.3f}\nLPIPS: {lpips.mean():.3f}")
+    #         print(f"PSNR: {psnrs.mean():.2f}\nSSIM: {ssims.mean():.3f}\nLPIPS: {lpips.mean():.3f}")
 
 def mse2psnr(x):
     return -10.*torch.log(x)/torch.log(torch.tensor(10.))

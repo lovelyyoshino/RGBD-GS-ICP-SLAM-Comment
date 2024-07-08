@@ -31,11 +31,11 @@ class Camera():
         self.image_name = image_name
         self.depth_image_name = depth_image_name
         
-        self.original_image = image.clamp(0.0, 1.0).to('cuda:1')
-        self.original_depth_image = depth_image.to('cuda:1')
+        # self.original_image = image.clamp(0.0, 1.0).to('cuda:1')
+        # self.original_depth_image = depth_image.to('cuda:1')
         
-        self.image_width = self.original_image.shape[2]
-        self.image_height = self.original_image.shape[1]
+        # self.image_width = self.original_image.shape[2]
+        # self.image_height = self.original_image.shape[1]
 
         self.zfar = 100.0
         self.znear = 0.01
@@ -63,7 +63,7 @@ class MappingCams(nn.Module):
         self.cams[-1].share_memory()
 
 class MappingCam(nn.Module):
-    def __init__(self, cam_idx, R, t, FoVx, FoVy, image, depth_image,
+    def __init__(self, cam_idx, R, t, FoVx, FoVy, W,H,
                  cx, cy, fx, fy,
                  trans=np.array([0.0, 0.0, 0.0]), scale=1.0, data_device = "cuda"
                  ):
@@ -73,21 +73,21 @@ class MappingCam(nn.Module):
         self.t = t
         self.FoVx = FoVx
         self.FoVy = FoVy
-        self.image_width = image.shape[1]
-        self.image_height = image.shape[0]
+        self.image_width = W
+        self.image_height = H
         self.cx = cx
         self.cy = cy
         self.fx = fx
         self.fy = fy
         self.last_loss = 0.
         
-        self.original_image = torch.from_numpy(image).float().cuda().permute(2,0,1)/255
+        # self.original_image = torch.from_numpy(image).float().cuda().permute(2,0,1)/255
         # rgb_level_1 = cv2.resize(image, (self.image_width//2, self.image_height//2))
         # rgb_level_2 = cv2.resize(image, (self.image_width//4, self.image_height//4))
         # self.rgb_level_1 = torch.from_numpy(rgb_level_1).float().cuda().permute(2,0,1)/255
         # self.rgb_level_2 = torch.from_numpy(rgb_level_2).float().cuda().permute(2,0,1)/255
         
-        self.original_depth_image = torch.from_numpy(depth_image).float().unsqueeze(0).cuda()
+        # self.original_depth_image = torch.from_numpy(depth_image).float().unsqueeze(0).cuda()
         # depth_level_1 = cv2.resize(depth_image, (self.image_width//2, self.image_height//2), interpolation=cv2.INTER_NEAREST)
         # depth_level_2 = cv2.resize(depth_image, (self.image_width//4, self.image_height//4), interpolation=cv2.INTER_NEAREST)
         # self.depth_level_1 = torch.from_numpy(depth_level_1).float().unsqueeze(0).cuda()
@@ -111,8 +111,8 @@ class MappingCam(nn.Module):
 
 class MiniCam:
     def __init__(self, width, height, fovy, fovx, znear, zfar, world_view_transform, full_proj_transform):
-        self.image_width = width
-        self.image_height = height    
+        # self.image_width = width
+        # self.image_height = height    
         self.FoVy = fovy
         self.FoVx = fovx
         self.znear = znear
