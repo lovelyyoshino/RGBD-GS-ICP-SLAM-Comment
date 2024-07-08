@@ -32,10 +32,10 @@ conda activate gsicpslam
 conda install pytorch==2.0.0 torchvision==0.15.0 torchaudio==2.0.0 pytorch-cuda=11.8 -c pytorch -c nvidia
 pip install -r requirements.txt
 
-# 安装pcl
-pip install pcl
-conda config --add channels conda-forge
-conda install -c sirokujira python-pcl  
+# 安装pcl,zanshibuxuyao
+# pip install pcl
+# conda config --add channels conda-forge
+# conda install -c sirokujira python-pcl  
 ```
 Also, PCL is needed for fast-gicp submodule.
 
@@ -60,7 +60,7 @@ cd submodules/fast_gicp
 mkdir build
 cd build
 cmake ..
-make
+make -j8
 cd ..
 python setup.py install --user
 ```

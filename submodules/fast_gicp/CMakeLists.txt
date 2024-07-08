@@ -7,7 +7,9 @@ option(BUILD_test "Build test programs" OFF)
 option(BUILD_PYTHON_BINDINGS "Build python bindings" OFF)
 
 set(CMAKE_BUILD_TYPE "Release")
-
+set(VTK_DIR "/usr/local/lib/cmake/vtk-9.2")
+find_package(VTK REQUIRED EXACT)
+set(PCL_DIR "/usr/share/pcl-1.13")
 find_package(PCL REQUIRED)
 find_package(Eigen3 REQUIRED)
 add_definitions(${PCL_DEFINITIONS})

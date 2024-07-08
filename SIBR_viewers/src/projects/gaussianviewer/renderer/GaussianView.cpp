@@ -360,7 +360,11 @@ sibr::GaussianView::GaussianView(const sibr::BasicIBRScene::Ptr & ibrScene, uint
 	std::vector<Scale> scale;
 	std::vector<float> opacity;
 	std::vector<SHs<3>> shs;
-	if (sh_degree == 1)
+	if (sh_degree == 0)
+	{
+		count = loadPly<0>(file, pos, shs, opacity, scale, rot, _scenemin, _scenemax);
+	}
+	else if (sh_degree == 1)
 	{
 		count = loadPly<1>(file, pos, shs, opacity, scale, rot, _scenemin, _scenemax);
 	}
