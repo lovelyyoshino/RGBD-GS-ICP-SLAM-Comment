@@ -39,43 +39,29 @@ void resetScene(RemoteAppArgs myArgs,
 	}
 
 	BasicIBRScene::SceneOptions myOpts;
-	// myOpts.renderTargets = myArgs.loadImages;
-	// myOpts.mesh = true;
-	// myOpts.images = myArgs.loadImages;
-	// myOpts.cameras = true;
-	// myOpts.texture = false;
 	myOpts.renderTargets = myArgs.loadImages;
 	myOpts.mesh = true;
 	myOpts.images = myArgs.loadImages;
 	myOpts.cameras = true;
 	myOpts.texture = false;
 
-	scene.reset(new BasicIBRScene(myArgs, myOpts));
-
-	// try
-	// {
-	// 	scene.reset(new BasicIBRScene(myArgs, myOpts));
-	// }
-	// catch (std::exception& ex)
-	// {
-	// 	SIBR_ERR << "Problem loading model info from input path " << myArgs.dataset_path
-	// 		<< ". Consider overriding path to model directory using --path.";
-	// }
+	try
+	{
+		scene.reset(new BasicIBRScene(myArgs, myOpts));
+	}
+	catch (std::exception& ex)
+	{
+		SIBR_ERR << "Problem loading model info from input path " << myArgs.dataset_path
+			<< ". Consider overriding path to model directory using --path.";
+	}
 
 	// Setup the scene: load the proxy, create the texture arrays.
 	const uint flags = SIBR_GPU_LINEAR_SAMPLING | SIBR_FLIP_TEXTURE;
 
 	// Fix rendering aspect ratio if user provided rendering size
-	// float divider = scene->cameras()->inputCameras()[0]->w() / std::min(1200.f, (float)scene->cameras()->inputCameras()[0]->w());
-	// uint scene_width = scene->cameras()->inputCameras()[0]->w();
-	// uint scene_height = scene->cameras()->inputCameras()[0]->h();
-	// float scene_aspect_ratio = scene_width * 1.0f / scene_height;
-	// float rendering_aspect_ratio = rendering_width * 1.0f / rendering_height;
-	
-	// 수정
-	float divider = 640 / std::min(1200.f, 640.f);
-	uint scene_width = 640;
-	uint scene_height = 480;
+	float divider = scene->cameras()->inputCameras()[0]->w() / std::min(1200.f, (float)scene->cameras()->inputCameras()[0]->w());
+	uint scene_width = scene->cameras()->inputCameras()[0]->w();
+	uint scene_height = scene->cameras()->inputCameras()[0]->h();
 	float scene_aspect_ratio = scene_width * 1.0f / scene_height;
 	float rendering_aspect_ratio = rendering_width * 1.0f / rendering_height;
 
@@ -89,44 +75,35 @@ void resetScene(RemoteAppArgs myArgs,
 			}
 		}
 	}
-	
 
 	// check rendering size
-	rendering_width = (rendering_width <= 0) ? scene_width / divider : rendering_width;
-	rendering_height = (rendering_height <= 0) ? scene_height / divider : rendering_height;
+	rendering_width = (rendering_width <= 0) ? scene->cameras()->inputCameras()[0]->w() / divider : rendering_width;
+	rendering_height = (rendering_height <= 0) ? scene->cameras()->inputCameras()[0]->h() / divider : rendering_height;
 	Vector2u usedResolution(rendering_width, rendering_height);
 
 	const unsigned int sceneResWidth = usedResolution.x();
 	const unsigned int sceneResHeight = usedResolution.y();
-	
 
 	pointBasedView->setScene(scene);
 	pointBasedView->setResolution({ sceneResWidth, sceneResHeight });
-	std::cout << "Done till here" << std::endl;
-
 
 	// Raycaster.
 	std::shared_ptr<sibr::Raycaster> raycaster = std::make_shared<sibr::Raycaster>();
 	raycaster->init();
 	raycaster->addMesh(scene->proxies()->proxy());
-	
 
 	// Camera handler for main view.
 	sibr::InteractiveCameraHandler::Ptr generalCamera(new InteractiveCameraHandler());
-	// 이거 필수
-	// Dummy 카메라 넣자
 	generalCamera->setup(scene->cameras()->inputCameras(), Viewport(0, 0, (float)usedResolution.x(), (float)usedResolution.y()), nullptr);
-	
-	// Top view
-	// topView.reset(new sibr::SceneDebugView(scene, generalCamera, myArgs));
-	// multiViewManager.addSubView("Top view", topView, usedResolution);
-	// topView->active(false);
 
-	
+	// Top view
+	topView.reset(new sibr::SceneDebugView(scene, generalCamera, myArgs));
+	multiViewManager.addSubView("Top view", topView, usedResolution);
+	topView->active(false);
 
 	multiViewManager.addIBRSubView("Point view", pointBasedView, { sceneResWidth, sceneResHeight }, ImGuiWindowFlags_NoBringToFrontOnFocus);
 	multiViewManager.addCameraForView("Point view", generalCamera);
-	
+
 	CHECK_GL_ERROR;
 
 	// save images

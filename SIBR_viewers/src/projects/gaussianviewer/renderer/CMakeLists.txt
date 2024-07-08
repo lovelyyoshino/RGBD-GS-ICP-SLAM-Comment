@@ -8,12 +8,14 @@
 # For inquiries contact sibr@inria.fr and/or George.Drettakis@inria.fr
 
 set(SIBR_PROJECT "gaussian")
-project(sibr_${SIBR_PROJECT} LANGUAGES CXX CUDA)
+project(sibr_${SIBR_PROJECT} LANGUAGES CXX)
 
 sibr_gitlibrary(TARGET CudaRasterizer
     GIT_REPOSITORY 	"https://github.com/graphdeco-inria/diff-gaussian-rasterization.git"
     GIT_TAG			"3509be80f83ee30599b23bb3542d45aea2174a03"
 )
+
+find_package(CUDAToolkit REQUIRED)
 
 file(GLOB SOURCES "*.cpp" "*.h" "*.hpp")
 source_group("Source Files" FILES ${SOURCES})
@@ -26,7 +28,7 @@ file(GLOB SOURCES "*.cpp" "*.h" "*.hpp" "shaders/*.frag" "shaders/*.vert" "shade
 ## Specify target rules
 add_library(${PROJECT_NAME} SHARED ${SOURCES})
 
-include_directories(${Boost_INCLUDE_DIRS} ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES} .)
+include_directories(${Boost_INCLUDE_DIRS} .)
 if (WIN32)
 target_link_libraries(${PROJECT_NAME}
 	${Boost_LIBRARIES}
@@ -40,6 +42,7 @@ target_link_libraries(${PROJECT_NAME}
 	sibr_assets
 	sibr_renderer
 	sibr_basic
+	CUDA::cudart
 	CudaRasterizer
 )
 else()
@@ -55,6 +58,7 @@ target_link_libraries(${PROJECT_NAME}
 	sibr_assets
 	sibr_renderer
 	sibr_basic
+	CUDA::cudart
 	CudaRasterizer
 )
 endif()

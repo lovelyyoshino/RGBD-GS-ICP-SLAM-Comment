@@ -68,9 +68,6 @@ namespace sibr
 		if (_data->datasetType() != IParseData::Type::EMPTY) {
 			createFromData(myArgs.texture_width);
 		}
-		else {
-			createFromCustomData(_data, myArgs.texture_width, _currentOpts);
-		}
 	}
 
 	void BasicIBRScene::createFromCustomData(const IParseData::Ptr & data, const uint width, BasicIBRScene::SceneOptions myOpts)

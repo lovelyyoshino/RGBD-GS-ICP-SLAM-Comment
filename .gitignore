@@ -1,6 +1,10 @@
 SIBR_viewers/build
 SIBR_viewers/extlibs
 SIBR_viewers/install
+submodules/diff-gaussian-rasterization/build
+submodules/fast_gicp/build
+submodules/simple-knn/build
+submodules/simple-knn/simple_knn.egg-info/
 
 experiments
 

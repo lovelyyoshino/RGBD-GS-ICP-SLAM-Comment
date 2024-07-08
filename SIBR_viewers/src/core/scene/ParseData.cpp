@@ -80,21 +80,6 @@ namespace sibr {
 		}
 	}
 
-	void ParseData::populateDummy()
-	{
-		_numCameras = 1;
-		_imgInfos.resize(_numCameras);
-		_activeImages.resize(_numCameras);
-		for (uint id = 0; id < _numCameras; id++) {
-			_imgInfos[id].camId = _camInfos[id]->id();
-			_imgInfos[id].filename = _camInfos[id]->name();
-			_imgInfos[id].height = _camInfos[id]->h();
-			_imgInfos[id].width = _camInfos[id]->w();
-
-			_activeImages[id] = _camInfos[id]->isActive();
-		}
-	}
-
 	bool ParseData::parseSceneMetadata(const std::string& scene_metadata_path)
 	{
 
@@ -286,20 +271,6 @@ namespace sibr {
 		populateFromCamInfos();
 
 		_meshPath = dataset_path + "/input.ply";
-	}
-
-	void ParseData::getParsedLairData(const std::string& dataset_path)
-	{
-		_camInfos = InputCamera::DummyCam(dataset_path + "/cameras.json");
-		// _meshPath = dataset_path + "/input.ply";
-
-		_basePathName = dataset_path;
-
-		_imgPath = dataset_path + "/images/";
-
-		populateFromCamInfos();
-
-		// _meshPath = dataset_path + "/input.ply";
 	}
 
 	void ParseData::getParsedColmap2Data(const std::string& dataset_path, const int fovXfovY_flag, const bool capreal_flag)
@@ -586,9 +557,7 @@ namespace sibr {
 				_datasetType = Type::BLENDER;
 			}
 			else {
-				// SIBR_ERR << "Cannot determine type of dataset at /" + myArgs.dataset_path.get() + customPath << std::endl;
-				_datasetType = Type::EMPTY;
-				std::cout << "Cannot determine type of dataset at /" + myArgs.dataset_path.get() + customPath <<std::endl;
+				SIBR_ERR << "Cannot determine type of dataset at /" + myArgs.dataset_path.get() + customPath << std::endl;
 			}
 		}
 
@@ -603,7 +572,6 @@ namespace sibr {
 			case Type::NVM : 			getParsedNVMData(myArgs.dataset_path, customPath, "/nvm/"); break;
 			case Type::MESHROOM : 		if (sibr::directoryExists(meshroom)) getParsedMeshroomData(myArgs.dataset_path.get() + "/../../");
 										else if (sibr::directoryExists(meshroom_sibr)) getParsedMeshroomData(myArgs.dataset_path); break;
-			case Type::EMPTY : getParsedLairData(myArgs.dataset_path); break;
 		}
 		
 		// What happens if multiple are present?
