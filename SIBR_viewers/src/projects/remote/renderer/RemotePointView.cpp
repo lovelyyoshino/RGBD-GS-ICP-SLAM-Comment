@@ -33,71 +33,131 @@ void sibr::RemotePointView::send_receive()
 	while (keep_running)
 	{
 		SIBR_LOG << "Trying to connect..." << std::endl;
-		try
+		// try
+		// {
+		// 	boost::asio::io_service ioservice;
+		// 	boost::asio::ip::tcp::socket sock(ioservice);
+		// 	boost::asio::ip::address addr = boost::asio::ip::address::from_string(_ip);
+		// 	boost::asio::ip::tcp::endpoint contact(addr, _port);
+
+		// 	boost::system::error_code ec;
+		// 	do
+		// 	{
+		// 		sock.connect(contact, ec);
+		// 		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+		// 	} while (keep_running && ec.failed());
+
+		// 	SIBR_LOG << "Connected!" << std::endl;
+		// 	while (keep_running)
+		// 	{
+		// 		{
+		// 			std::lock_guard<std::mutex> lg(_renderDataMutex);
+
+		// 			// Serialize our arbitrary data to something simple, yet convenient for both sides
+		// 			json sendData;
+		// 			sendData[jTrain] = _doTrainingBool ? 1 : 0;
+		// 			sendData[jSHsPython] = _doSHsPython ? 1 : 0;
+		// 			sendData[jRotScalePython] = _doRotScalePython ? 1 : 0;
+		// 			sendData[jScalingModifier] = _scalingModifier;
+		// 			sendData[jResX] = _remoteInfo.imgResolution.x();
+		// 			sendData[jResY] = _remoteInfo.imgResolution.y();
+		// 			sendData[jFovY] = _remoteInfo.fovy;
+		// 			sendData[jFovX] = _remoteInfo.fovx;
+		// 			sendData[jZFar] = _remoteInfo.zfar;
+		// 			sendData[jZNear] = _remoteInfo.znear;
+		// 			sendData[jKeepAlive] = _keepAlive ? 1 : 0;
+		// 			sendData[jViewMat] = std::vector<float>((float*)&_remoteInfo.view, ((float*)&_remoteInfo.view) + 16);
+		// 			sendData[jViewProjMat] = std::vector<float>((float*)&_remoteInfo.viewProj, ((float*)&_remoteInfo.viewProj) + 16);
+
+		// 			std::string message = sendData.dump();
+		// 			uint32_t messageLength = message.size();
+		// 			boost::asio::write(sock, boost::asio::buffer(&messageLength, sizeof(uint32_t)));
+		// 			boost::asio::write(sock, boost::asio::buffer(message.c_str(), messageLength));
+		// 		}
+
+		// 		uint32_t bytes_to_receive = _remoteInfo.imgResolution.x() * _remoteInfo.imgResolution.y() * 3;
+		// 		if (bytes_to_receive > 0)
+		// 		{
+		// 			std::lock_guard<std::mutex> ilg(_imageDataMutex);
+		// 			_imageData.resize(bytes_to_receive);
+		// 			boost::asio::read(sock, boost::asio::buffer(_imageData.data(), _imageData.size()));
+		// 			{
+		// 				std::lock_guard<std::mutex> lg(_renderDataMutex);
+		// 				_timestampReceived = _timestampRequested;
+		// 			}
+		// 			_imageDirty = true;
+		// 		}
+		// 		uint32_t sceneLength;
+		// 		boost::asio::read(sock, boost::asio::buffer(&sceneLength, sizeof(uint32_t)));
+		// 		std::vector<char> sceneName(sceneLength);
+		// 		boost::asio::read(sock, boost::asio::buffer(sceneName.data(), sceneLength));
+		// 		sceneName.push_back(0);
+		// 		current_scene = std::string(sceneName.data());
+		// 	}
+		// }
+		// catch (...)
+		// {
+		// 	SIBR_LOG << "Connection dropped" << std::endl;
+		// }
+		
+		boost::asio::io_service ioservice;
+		boost::asio::ip::tcp::socket sock(ioservice);
+		boost::asio::ip::address addr = boost::asio::ip::address::from_string(_ip);
+		boost::asio::ip::tcp::endpoint contact(addr, _port);
+
+		boost::system::error_code ec;
+		do
 		{
-			boost::asio::io_service ioservice;
-			boost::asio::ip::tcp::socket sock(ioservice);
-			boost::asio::ip::address addr = boost::asio::ip::address::from_string(_ip);
-			boost::asio::ip::tcp::endpoint contact(addr, _port);
+			sock.connect(contact, ec);
+			std::this_thread::sleep_for(std::chrono::milliseconds(100));
+		} while (keep_running && ec.failed());
 
-			boost::system::error_code ec;
-			do
+		SIBR_LOG << "Connected!" << std::endl;
+		while (keep_running)
+		{
 			{
-				sock.connect(contact, ec);
-				std::this_thread::sleep_for(std::chrono::milliseconds(100));
-			} while (keep_running && ec.failed());
+				std::lock_guard<std::mutex> lg(_renderDataMutex);
 
-			SIBR_LOG << "Connected!" << std::endl;
-			while (keep_running)
+				// Serialize our arbitrary data to something simple, yet convenient for both sides
+				json sendData;
+				sendData[jTrain] = _doTrainingBool ? 1 : 0;
+				sendData[jSHsPython] = _doSHsPython ? 1 : 0;
+				sendData[jRotScalePython] = _doRotScalePython ? 1 : 0;
+				sendData[jScalingModifier] = _scalingModifier;
+				sendData[jResX] = _remoteInfo.imgResolution.x();
+				sendData[jResY] = _remoteInfo.imgResolution.y();
+				sendData[jFovY] = _remoteInfo.fovy;
+				sendData[jFovX] = _remoteInfo.fovx;
+				sendData[jZFar] = _remoteInfo.zfar;
+				sendData[jZNear] = _remoteInfo.znear;
+				sendData[jKeepAlive] = _keepAlive ? 1 : 0;
+				sendData[jViewMat] = std::vector<float>((float*)&_remoteInfo.view, ((float*)&_remoteInfo.view) + 16);
+				sendData[jViewProjMat] = std::vector<float>((float*)&_remoteInfo.viewProj, ((float*)&_remoteInfo.viewProj) + 16);
+
+				std::string message = sendData.dump();
+				uint32_t messageLength = message.size();
+				boost::asio::write(sock, boost::asio::buffer(&messageLength, sizeof(uint32_t)));
+				boost::asio::write(sock, boost::asio::buffer(message.c_str(), messageLength));
+			}
+
+			uint32_t bytes_to_receive = _remoteInfo.imgResolution.x() * _remoteInfo.imgResolution.y() * 3;
+			if (bytes_to_receive > 0)
 			{
+				std::lock_guard<std::mutex> ilg(_imageDataMutex);
+				_imageData.resize(bytes_to_receive);
+				boost::asio::read(sock, boost::asio::buffer(_imageData.data(), _imageData.size()));
 				{
 					std::lock_guard<std::mutex> lg(_renderDataMutex);
-
-					// Serialize our arbitrary data to something simple, yet convenient for both sides
-					json sendData;
-					sendData[jTrain] = _doTrainingBool ? 1 : 0;
-					sendData[jSHsPython] = _doSHsPython ? 1 : 0;
-					sendData[jRotScalePython] = _doRotScalePython ? 1 : 0;
-					sendData[jScalingModifier] = _scalingModifier;
-					sendData[jResX] = _remoteInfo.imgResolution.x();
-					sendData[jResY] = _remoteInfo.imgResolution.y();
-					sendData[jFovY] = _remoteInfo.fovy;
-					sendData[jFovX] = _remoteInfo.fovx;
-					sendData[jZFar] = _remoteInfo.zfar;
-					sendData[jZNear] = _remoteInfo.znear;
-					sendData[jKeepAlive] = _keepAlive ? 1 : 0;
-					sendData[jViewMat] = std::vector<float>((float*)&_remoteInfo.view, ((float*)&_remoteInfo.view) + 16);
-					sendData[jViewProjMat] = std::vector<float>((float*)&_remoteInfo.viewProj, ((float*)&_remoteInfo.viewProj) + 16);
-
-					std::string message = sendData.dump();
-					uint32_t messageLength = message.size();
-					boost::asio::write(sock, boost::asio::buffer(&messageLength, sizeof(uint32_t)));
-					boost::asio::write(sock, boost::asio::buffer(message.c_str(), messageLength));
+					_timestampReceived = _timestampRequested;
 				}
-
-				uint32_t bytes_to_receive = _remoteInfo.imgResolution.x() * _remoteInfo.imgResolution.y() * 3;
-				if (bytes_to_receive > 0)
-				{
-					std::lock_guard<std::mutex> ilg(_imageDataMutex);
-					_imageData.resize(bytes_to_receive);
-					boost::asio::read(sock, boost::asio::buffer(_imageData.data(), _imageData.size()));
-					{
-						std::lock_guard<std::mutex> lg(_renderDataMutex);
-						_timestampReceived = _timestampRequested;
-					}
-					_imageDirty = true;
-				}
-				uint32_t sceneLength;
-				boost::asio::read(sock, boost::asio::buffer(&sceneLength, sizeof(uint32_t)));
-				std::vector<char> sceneName(sceneLength);
-				boost::asio::read(sock, boost::asio::buffer(sceneName.data(), sceneLength));
-				sceneName.push_back(0);
-				current_scene = std::string(sceneName.data());
+				_imageDirty = true;
 			}
-		}
-		catch (...)
-		{
-			SIBR_LOG << "Connection dropped" << std::endl;
+			uint32_t sceneLength;
+			boost::asio::read(sock, boost::asio::buffer(&sceneLength, sizeof(uint32_t)));
+			std::vector<char> sceneName(sceneLength);
+			boost::asio::read(sock, boost::asio::buffer(sceneName.data(), sceneLength));
+			sceneName.push_back(0);
+			current_scene = std::string(sceneName.data());
 		}
 	}
 }

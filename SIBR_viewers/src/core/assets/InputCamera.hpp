@@ -274,6 +274,8 @@ namespace sibr
 
 		static std::vector<InputCamera::Ptr> InputCamera::loadTransform(const std::string& transformPath, int w, int h, std::string extension, const float zNear = 0.01f, const float zFar = 1000.0f, const int offset = 0, const int fovXfovYFlag = 0);
 
+		static std::vector<InputCamera::Ptr> InputCamera::DummyCam(const std::string& transformPath, int w=640, int h=480, std::string extension = "", const float zNear = 0.01f, const float zFar = 1000.0f, const int offset = 0, const int fovXfovYFlag = 0);
+
 		/** Load cameras from a Colmap txt file.
 		* \param colmapSparsePath path to the Colmap sparse directory, should contains cameras.txt and images.txt
 		* \param zNear default near-plane value to use
