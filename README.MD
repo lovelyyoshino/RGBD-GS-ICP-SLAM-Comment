@@ -127,6 +127,19 @@ python setup.py install --user
 
 ## Installing SIBR Viewer
 ```bash
+git clone https://github.com/embree/embree.git
+mkdir embress/build
+cd embree
+git checkout v3.1.0
+mkdir build
+cmake -DCMAKE_INSTALL_PREFIX=/usr \
+           -DEMBREE_TUTORIALS=OFF \
+			-DEMBREE_ISPC_SUPPORT=OFF \
+			-DEMBREE_TASKING_SYSTEM=OFF ..
+make -j8
+sudo make install
+
+
 cd SIBR_viewers
 cmake -Bbuild . -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j24 --target install
