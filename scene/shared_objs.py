@@ -128,8 +128,7 @@ class SharedTargetPoints(nn.Module):
 这里做到的是将相机的参数和图像信息都放在了一个类里面，这样就可以直接调用这个类来获取相机的参数和图像信息
 """
 class SharedCam(nn.Module):
-    def __init__(self, FoVx, FoVy, image, depth_image,
-                 cx, cy, fx, fy,
+    def __init__(self, FoVx, FoVy, W,H,
                  trans=np.array([0.0, 0.0, 0.0]), scale=1.0):
         super().__init__()
         self.cam_idx = torch.zeros((1)).int()
@@ -137,20 +136,20 @@ class SharedCam(nn.Module):
         self.t = torch.zeros((3)).float()
         self.FoVx = torch.tensor([FoVx])
         self.FoVy = torch.tensor([FoVy])
-        self.image_width = torch.tensor([image.shape[1]])
-        self.image_height = torch.tensor([image.shape[0]])
-        self.cx = torch.tensor([cx])
-        self.cy = torch.tensor([cy])
-        self.fx = torch.tensor([fx])
-        self.fy = torch.tensor([fy])
+        self.image_width = W #torch.tensor([image.shape[1]])
+        self.image_height = H #torch.tensor([image.shape[0]])
+        # self.cx = torch.tensor([cx])
+        # self.cy = torch.tensor([cy])
+        # self.fx = torch.tensor([fx])
+        # self.fy = torch.tensor([fy])
         
-        self.original_image = torch.from_numpy(image).float().permute(2,0,1)/255 #获取图像信息
+        # self.original_image = torch.from_numpy(image).float().permute(2,0,1)/255 #获取图像信息
         # rgb_level_1 = cv2.resize(image, (self.image_width//2, self.image_height//2))
         # rgb_level_2 = cv2.resize(image, (self.image_width//4, self.image_height//4))
         # self.rgb_level_1 = torch.from_numpy(rgb_level_1).float().cuda().permute(2,0,1)/255
         # self.rgb_level_2 = torch.from_numpy(rgb_level_2).float().cuda().permute(2,0,1)/255
         
-        self.original_depth_image = torch.from_numpy(depth_image).float().unsqueeze(0)#获取深度图像信息
+        # self.original_depth_image = torch.from_numpy(depth_image).float().unsqueeze(0)#获取深度图像信息
         # depth_level_1 = cv2.resize(depth_image, (self.image_width//2, self.image_height//2), interpolation=cv2.INTER_NEAREST)
         # depth_level_2 = cv2.resize(depth_image, (self.image_width//4, self.image_height//4), interpolation=cv2.INTER_NEAREST)
         # self.depth_level_1 = torch.from_numpy(depth_level_1).float().unsqueeze(0).cuda()
@@ -194,8 +193,7 @@ class SharedCam(nn.Module):
 
 
 class MappingCam(nn.Module):
-    def __init__(self, cam_idx, R, t, FoVx, FoVy, image, depth_image,
-                 cx, cy, fx, fy,
+    def __init__(self, cam_idx, R, t, FoVx, FoVy, W,H,
                  trans=np.array([0.0, 0.0, 0.0]), scale=1.0, data_device = "cuda"
                  ):
         super().__init__()
@@ -204,21 +202,21 @@ class MappingCam(nn.Module):
         self.t = t
         self.FoVx = FoVx
         self.FoVy = FoVy
-        self.image_width = image.shape[1]
-        self.image_height = image.shape[0]
-        self.cx = cx
-        self.cy = cy
-        self.fx = fx
-        self.fy = fy
+        self.image_width = W#image.shape[1]
+        self.image_height = H#image.shape[0]
+        # self.cx = cx
+        # self.cy = cy
+        # self.fx = fx
+        # self.fy = fy
         self.last_loss = 0.
         
-        self.original_image = torch.from_numpy(image).float().cuda().permute(2,0,1)/255
+        # self.original_image = torch.from_numpy(image).float().cuda().permute(2,0,1)/255
         # rgb_level_1 = cv2.resize(image, (self.image_width//2, self.image_height//2))
         # rgb_level_2 = cv2.resize(image, (self.image_width//4, self.image_height//4))
         # self.rgb_level_1 = torch.from_numpy(rgb_level_1).float().cuda().permute(2,0,1)/255
         # self.rgb_level_2 = torch.from_numpy(rgb_level_2).float().cuda().permute(2,0,1)/255
         
-        self.original_depth_image = torch.from_numpy(depth_image).float().unsqueeze(0).cuda()
+        # self.original_depth_image = torch.from_numpy(depth_image).float().unsqueeze(0).cuda()
         # depth_level_1 = cv2.resize(depth_image, (self.image_width//2, self.image_height//2), interpolation=cv2.INTER_NEAREST)
         # depth_level_2 = cv2.resize(depth_image, (self.image_width//4, self.image_height//4), interpolation=cv2.INTER_NEAREST)
         # self.depth_level_1 = torch.from_numpy(depth_level_1).float().unsqueeze(0).cuda()

@@ -168,3 +168,12 @@ cd SIBR_viewers
 
 ## Docker
 Please see the README.md in the docker_files folder.
+
+
+```
+mkdir -p gs_ws/src
+cd gs_ws
+catkin_make
+LD_PRELOAD=/home/ld/.local/lib/python3.9/site-packages/pygicp-0.0.1-py3.9-linux-x86_64.egg/libfast_gicp.so rosrun gs_icp_slam ros_gs_icp.py
+
+```

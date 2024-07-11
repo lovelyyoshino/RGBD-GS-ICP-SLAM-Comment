@@ -3,6 +3,7 @@ import os
 import torch.multiprocessing as mp
 import torch.multiprocessing
 import sys
+print(sys.executable)
 import cv2
 import open3d as o3d
 import time
@@ -64,13 +65,13 @@ class GS_ICP_SLAM(SLAMParameters):
         self.camera_parameters = camera_parameters_[2].split() # 获取相机参数
         self.W = int(self.camera_parameters[0]) # 图像宽度
         self.H = int(self.camera_parameters[1]) # 图像高度
-        # self.fx = float(self.camera_parameters[2]) # fx
-        # self.fy = float(self.camera_parameters[3]) # fy
+        self.fx = float(self.camera_parameters[2]) # fx
+        self.fy = float(self.camera_parameters[3]) # fy
         # self.cx = float(self.camera_parameters[4]) # cx
         # self.cy = float(self.camera_parameters[5]) # cy
         self.depth_scale = float(self.camera_parameters[6]) # 深度缩放
         self.depth_trunc = float(self.camera_parameters[7]) # 深度截断
-        self.downsample_idxs, self.x_pre, self.y_pre = self.set_downsample_filter(self.downsample_rate) # 下采样索引，x_pre，y_pre
+        # self.downsample_idxs, self.x_pre, self.y_pre = self.set_downsample_filter(self.downsample_rate) # 下采样索引，x_pre，y_pre
         
         try:
             mp.set_start_method('spawn', force=True) # 设置启动方法, 强制使用spawn
@@ -196,8 +197,8 @@ def pointcloud_callback(cloud_msg):
 
 if __name__ == '__main__':
     parser = ArgumentParser(description="dataset_path / output_path / verbose")
-    parser.add_argument("--dataset_path", help="dataset path", default="dataset/Replica/room0")
-    parser.add_argument("--config", help="caminfo", default="configs/Replica/caminfo.txt")
+    parser.add_argument("--dataset_path", help="dataset path", default="src/RGBD-GS-ICP-SLAM-Comment/dataset/Replica/room0")
+    parser.add_argument("--config", help="caminfo", default="src/RGBD-GS-ICP-SLAM-Comment/configs/Replica/caminfo.txt")
     parser.add_argument("--output_path", help="output path", default="output/room0")
     parser.add_argument("--keyframe_th", default=0.7)
     parser.add_argument("--knn_maxd", default=99999.0)

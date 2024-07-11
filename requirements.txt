@@ -8,3 +8,4 @@ empy
 catkin_pkg
 setuptools==69.5.1
 scipy==1.11.1
+rospkg

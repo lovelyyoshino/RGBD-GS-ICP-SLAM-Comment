@@ -1,0 +1,23 @@
+<launch>
+  <!-- 设置必要的环境变量 -->
+  <env name="LD_LIBRARY_PATH" value="/home/ld/.local/lib/python3.9/site-packages/pygicp-0.0.1-py3.9-linux-x86_64.egg:$LD_LIBRARY_PATH"/>
+
+  <!-- 启动GS_ICP_SLAM节点 -->
+  <node name="gs_icp_slam" pkg="RGBD-GS-ICP-SLAM-Comment" type="ros_gs_icp.py" output="screen">
+    <!-- 传递参数 -->
+    <param name="dataset_path" value="src/RGBD-GS-ICP-SLAM-Comment/dataset/Replica/room0"/>
+    <param name="config" value="src/RGBD-GS-ICP-SLAM-Comment/configs/Replica/caminfo.txt"/>
+    <param name="output_path" value="output/room0"/>
+    <param name="keyframe_th" value="0.7"/>
+    <param name="knn_maxd" value="99999.0"/>
+    <param name="verbose" value="false"/>
+    <param name="demo" value="false"/>
+    <param name="overlapped_th" value="5e-4"/>
+    <param name="max_correspondence_distance" value="0.02"/>
+    <param name="trackable_opacity_th" value="0.05"/>
+    <param name="overlapped_th2" value="5e-5"/>
+    <param name="downsample_rate" value="10"/>
+    <param name="test" value=""/>
+    <param name="save_results" value="false"/>
+  </node>
+</launch>
